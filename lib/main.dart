@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:flutter/material.dart';
@@ -15,7 +16,7 @@ void main() async {
   runApp(const MyApp());
 }
 
-enum routes { signIn, counter }
+enum Routes { signIn, counter }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -25,19 +26,19 @@ class MyApp extends StatelessWidget {
     final providers = [EmailAuthProvider()];
 
     return MaterialApp(
-      initialRoute: fb_auth.FirebaseAuth.instance.currentUser == null ? routes.signIn.name : routes.counter.name,
+      initialRoute: fb_auth.FirebaseAuth.instance.currentUser == null ? Routes.signIn.name : Routes.counter.name,
       routes: {
-        routes.signIn.name: (context) {
+        Routes.signIn.name: (context) {
           return SignInScreen(
             providers: providers,
             actions: [
               AuthStateChangeAction<SignedIn>((context, state) {
-                Navigator.pushReplacementNamed(context, routes.counter.name);
+                Navigator.pushReplacementNamed(context, Routes.counter.name);
               }),
             ],
           );
         },
-        routes.counter.name: (context) {
+        Routes.counter.name: (context) {
           return CounterScreen(
             title: "Counter for ${fb_auth.FirebaseAuth.instance.currentUser?.email ?? ''}",
           );
@@ -58,11 +59,21 @@ class CounterScreen extends StatefulWidget {
 
 class _CounterScreenState extends State<CounterScreen> {
   int _counter = 0;
+  final userId = fb_auth.FirebaseAuth.instance.currentUser?.uid;
+  late final DocumentReference<Map<String, dynamic>> docRef;
 
   void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
+    final userData = {
+      "counter": _counter++,
+    };
+    final db = FirebaseFirestore.instance;
+    db.collection("users").doc(userId).set(userData).onError((e, _) => debugPrint("Error writing document: $e"));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    docRef = FirebaseFirestore.instance.collection("users").doc(userId);
   }
 
   @override
@@ -74,7 +85,7 @@ class _CounterScreenState extends State<CounterScreen> {
           IconButton(
             onPressed: () {
               fb_auth.FirebaseAuth.instance.signOut();
-              Navigator.pushReplacementNamed(context, routes.signIn.name);
+              Navigator.pushReplacementNamed(context, Routes.signIn.name);
             },
             icon: const Icon(Icons.exit_to_app),
           ),
@@ -87,9 +98,21 @@ class _CounterScreenState extends State<CounterScreen> {
             const Text(
               'You have pushed the button this many times:',
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
+            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: docRef.snapshots(),
+                builder: (context, snapshot) {
+                  final userData = snapshot.data?.data();
+                  if (!snapshot.hasData || userData == null) {
+                    return const CircularProgressIndicator();
+                  }
+                  final loadedCount = userData["counter"];
+                  print("loaded count:$loadedCount");
+                  _counter = loadedCount;
+                  return Text(
+                    '$_counter',
+                    style: Theme.of(context).textTheme.headline4,
+                  );
+                }
             ),
           ],
         ),
