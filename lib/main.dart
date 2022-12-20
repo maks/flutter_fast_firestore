@@ -58,16 +58,15 @@ class CounterScreen extends StatefulWidget {
 }
 
 class _CounterScreenState extends State<CounterScreen> {
-  int _counter = 0;
   final userId = fb_auth.FirebaseAuth.instance.currentUser?.uid;
   late final DocumentReference<Map<String, dynamic>> docRef;
 
   void _incrementCounter() {
     final userData = {
-      "counter": _counter++,
+      "counter": FieldValue.increment(1),
     };
     final db = FirebaseFirestore.instance;
-    db.collection("users").doc(userId).set(userData).onError((e, _) => debugPrint("Error writing document: $e"));
+    db.collection("users").doc(userId).update(userData).onError((e, _) => debugPrint("Error writing document: $e"));
   }
 
   @override
@@ -107,9 +106,8 @@ class _CounterScreenState extends State<CounterScreen> {
                   }
                   final loadedCount = userData["counter"];
                   print("loaded count:$loadedCount");
-                  _counter = loadedCount;
                   return Text(
-                    '$_counter',
+                    '$loadedCount',
                     style: Theme.of(context).textTheme.headline4,
                   );
                 }
